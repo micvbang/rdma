@@ -280,18 +280,16 @@ static int send_server_metadata_to_client()
 	// rdma_error("This function is not yet implemented \n");
 	int ret = -1;
 
-	// Allocate buffer for client to use.
-	server_buffer_mr = rdma_buffer_alloc(pd, 1 << 12,
+	// Allocate buffer for client to use for RDMA.
+	server_buffer_mr = rdma_buffer_alloc(pd, 1 << 12, // 4KB
 			(IBV_ACCESS_REMOTE_READ |
 			 IBV_ACCESS_LOCAL_WRITE | // Must be set when REMOTE_WRITE is set.
 			 IBV_ACCESS_REMOTE_WRITE));
-
 
 	// Prepare MR that we will send to client.
 	server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
 	server_metadata_attr.length = server_buffer_mr->length;
 	server_metadata_attr.stag.local_stag = server_buffer_mr->lkey;
-
 	server_metadata_mr = rdma_buffer_register(pd,
 			&server_metadata_attr,
 			sizeof(server_metadata_attr),
@@ -318,12 +316,13 @@ static int send_server_metadata_to_client()
 	server_send_wr.opcode = IBV_WR_SEND;
 	// This is what's used on the client.
 	// sq_sig_all is (implicitly) set to 0, so according to the docs (
-	// man ibv_post_send) this should be OK.
+	// man ibv_post_send(3)) this should be OK.
 	server_send_wr.send_flags = IBV_SEND_SIGNALED;
 
-	// Create WR used by ibv_post_send to tell us which of the WRs
+	// Create WR used by ibv_post_send(3) to tell us which of the WRs
 	// given was bad. Since we give only one value, it should be
-	// bad_wr = server_send_wr in case of an error or bad_wr = NULL if everything's OK.
+	// bad_wr == server_send_wr in case of an error and
+	// bad_wr == NULL if everything's OK.
 	struct ibv_send_wr *bad_wr = NULL;
 
 	// Send WR to client.
@@ -336,7 +335,7 @@ static int send_server_metadata_to_client()
 	// Here, we could check how many work completions we have on our
 	// io_completion_channel, to "ensure" that everything went well.
 	// This is done in rdma_client.c->client_send_metadata_to_server.
-
+	// I guess we don't really have to do that.
 	return 0;
 }
 
