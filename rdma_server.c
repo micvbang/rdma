@@ -21,7 +21,7 @@ static struct ibv_qp_init_attr qp_init_attr;
 static struct ibv_qp *client_qp = NULL;
 /* RDMA memory resources */
 static struct ibv_mr *client_metadata_mr = NULL, *server_buffer_mr = NULL, *server_metadata_mr = NULL;
-static struct rdma_buffer_attr client_metadata_attr;
+static struct rdma_buffer_attr client_metadata_attr, server_metadata_attr;
 static struct ibv_recv_wr client_recv_wr, *bad_client_recv_wr = NULL;
 static struct ibv_sge client_recv_sge;
 
@@ -277,9 +277,67 @@ static int accept_client_connection()
 /* This function sends server side buffer metadata to the connected client */
 static int send_server_metadata_to_client()
 {
-	rdma_error("This function is not yet implemented \n");
-	/* IMPLEMENT THIS FUNCTION */
-	   return -ENOSYS;
+	// rdma_error("This function is not yet implemented \n");
+	int ret = -1;
+
+	// Allocate buffer for client to use.
+	server_buffer_mr = rdma_buffer_alloc(pd, 1 << 12,
+			(IBV_ACCESS_REMOTE_READ |
+			 IBV_ACCESS_LOCAL_WRITE | // Must be set when REMOTE_WRITE is set.
+			 IBV_ACCESS_REMOTE_WRITE));
+
+
+	// Prepare MR that we will send to client.
+	server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
+	server_metadata_attr.length = server_buffer_mr->length;
+	server_metadata_attr.stag.local_stag = server_buffer_mr->lkey;
+
+	server_metadata_mr = rdma_buffer_register(pd,
+			&server_metadata_attr,
+			sizeof(server_metadata_attr),
+			IBV_ACCESS_LOCAL_WRITE);
+	if (!server_metadata_mr) {
+		rdma_error("Failed to register the server metadata buffer, ret = %d \n", -errno);
+		return -errno;
+	}
+
+	// Create sge to be included in WR.
+	struct ibv_sge server_send_sge;
+	bzero(&server_send_sge, sizeof(server_send_sge));
+	server_send_sge.addr = (uint64_t)server_metadata_mr->addr;
+	server_send_sge.length = server_metadata_mr->length;
+	server_send_sge.lkey = server_metadata_mr->lkey;
+
+	// Create work request to send to client
+	// Note: server_metadata_mr.rkey is to be used by client to do RDMA
+	// on allocated memory. That might not be relevant here, though.
+	struct ibv_send_wr server_send_wr;
+	bzero(&server_send_wr, sizeof(server_send_wr));
+	server_send_wr.sg_list = &server_send_sge;
+	server_send_wr.num_sge = 1;
+	server_send_wr.opcode = IBV_WR_SEND;
+	// This is what's used on the client.
+	// sq_sig_all is (implicitly) set to 0, so according to the docs (
+	// man ibv_post_send) this should be OK.
+	server_send_wr.send_flags = IBV_SEND_SIGNALED;
+
+	// Create WR used by ibv_post_send to tell us which of the WRs
+	// given was bad. Since we give only one value, it should be
+	// bad_wr = server_send_wr in case of an error or bad_wr = NULL if everything's OK.
+	struct ibv_send_wr *bad_wr = NULL;
+
+	// Send WR to client.
+	ret = ibv_post_send(client_qp, &server_send_wr, &bad_wr);
+	if (ret) {
+		rdma_error("Failed to send server metadata, errno: %d\n", -errno);
+		return -errno;
+	}
+
+	// Here, we could check how many work completions we have on our
+	// io_completion_channel, to "ensure" that everything went well.
+	// This is done in rdma_client.c->client_send_metadata_to_server.
+
+	return 0;
 }
 
 /* This is server side logic. Server passively waits for the client to call
