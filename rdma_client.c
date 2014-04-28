@@ -316,8 +316,6 @@ static int client_remote_memory_ops()
 	struct ibv_send_wr *bad_wr = NULL;
 
 	// Send RDMA write request
-	struct ibv_send_wr rdma_write_wr;
-	bzero(&rdma_write_wr, sizeof(rdma_write_wr));
 	// I think this should let the CA-driver know which data we want to
 	//  RDMA-write to the server.
 	struct ibv_sge rdma_write_sge;
@@ -326,6 +324,8 @@ static int client_remote_memory_ops()
 	rdma_write_sge.length = client_src_mr->length;
 	rdma_write_sge.lkey = client_src_mr->lkey;
 
+	struct ibv_send_wr rdma_write_wr;
+	bzero(&rdma_write_wr, sizeof(rdma_write_wr));
 	rdma_write_wr.sg_list = &rdma_write_sge;
 	rdma_write_wr.num_sge = 1;
 	rdma_write_wr.opcode = IBV_WR_RDMA_WRITE;
@@ -360,7 +360,6 @@ static int client_remote_memory_ops()
 	rdma_read_sge.addr = (uint64_t)client_dst_mr->addr;
 	rdma_read_sge.length = client_dst_mr->length;
 	rdma_read_sge.lkey = client_dst_mr->lkey;
-	debug("rdma_read_sge.addr: %p\n", rdma_read_sge.addr);
 
 	// Create WR
 	struct ibv_send_wr rdma_read_wr;
@@ -368,9 +367,8 @@ static int client_remote_memory_ops()
 	rdma_read_wr.sg_list = &rdma_read_sge;
 	rdma_read_wr.num_sge = 1;
 	rdma_read_wr.opcode = IBV_WR_RDMA_READ;
-	rdma_read_wr.send_flags = IBV_SEND_INLINE;
-	rdma_write_wr.wr.rdma.remote_addr = server_metadata_attr.address;
-	rdma_write_wr.wr.rdma.rkey = server_metadata_attr.stag.local_stag;
+	rdma_read_wr.wr.rdma.remote_addr = server_metadata_attr.address;
+	rdma_read_wr.wr.rdma.rkey = server_metadata_attr.stag.local_stag;
 
 	// Post WR
 	debug("Trying to perform RDMA read\n");
