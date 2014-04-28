@@ -280,6 +280,11 @@ static int send_server_metadata_to_client()
 	// rdma_error("This function is not yet implemented \n");
 	int ret = -1;
 
+	// A hacky sleep which helps out with a timing problem.
+	// There should be a solution where we just wait on some event,
+	// instead of sleeping.
+	sleep(0.5);
+
 	// Allocate buffer to be used by client for RDMA.
 	server_buffer_mr = rdma_buffer_alloc(pd, 1 << 12, // 4KB
 			(IBV_ACCESS_REMOTE_READ |
