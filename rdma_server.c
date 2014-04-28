@@ -328,8 +328,8 @@ static int send_server_metadata_to_client()
 	// Send WR to client.
 	ret = ibv_post_send(client_qp, &server_send_wr, &bad_wr);
 	if (ret) {
-		rdma_error("Failed to send server metadata, errno: %d\n", -errno);
-		return -errno;
+		rdma_error("Failed to send server metadata, errno: %d\n", -ret);
+		return -ret;
 	}
 
 	// Here, we could check how many work completions we have on our
