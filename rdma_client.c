@@ -307,17 +307,17 @@ static int client_send_metadata_to_server()
  */
 static int client_remote_memory_ops()
 {
-	// rdma_error("This function is not yet implemented \n");
-
 	int ret = -1;
-	// Create and send work request with ibv_send_wr.rdma.{rkey,remote_addr}
-	// as received by server
 
 	struct ibv_send_wr *bad_wr = NULL;
 
-	// Send RDMA write request
-	// I think this should let the CA-driver know which data we want to
-	//  RDMA-write to the server.
+	/***************************
+	 * Send RDMA write request *
+	 ***************************/
+
+	// In RDMA write, the sge is used to tell the local CA what memory
+	// we want to read from, and write to the remote address.
+	// The remote address is set below in rdma_write_wr.wr.rdma.remote_addr.
 	struct ibv_sge rdma_write_sge;
 	bzero(&rdma_write_sge, sizeof(rdma_write_sge));
 	rdma_write_sge.addr = (uint64_t)client_src_mr->addr;
@@ -343,7 +343,9 @@ static int client_remote_memory_ops()
 	debug("Performed RMDA write\n");
 
 
-	// Send RDMA read request
+	/**************************
+	 * Send RDMA read request *
+	 **************************/
 	// Prepare dst buffer
 	client_dst_mr = rdma_buffer_register(pd,
 			dst,
@@ -355,6 +357,9 @@ static int client_remote_memory_ops()
 	}
 
 	// Create sge
+	// In RDMA read, the sge is used to tell the local CA what local memory
+	// we want to read the remote data in to.
+	// The remote address is set below in rdma_read_wr.wr.rdma.remote_addr.
 	struct ibv_sge rdma_read_sge;
 	bzero(&rdma_read_sge, sizeof(rdma_read_sge));
 	rdma_read_sge.addr = (uint64_t)client_dst_mr->addr;
