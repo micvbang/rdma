@@ -280,13 +280,14 @@ static int send_server_metadata_to_client()
 	// rdma_error("This function is not yet implemented \n");
 	int ret = -1;
 
-	// Allocate buffer for client to use for RDMA.
+	// Allocate buffer to be used by client for RDMA.
 	server_buffer_mr = rdma_buffer_alloc(pd, 1 << 12, // 4KB
 			(IBV_ACCESS_REMOTE_READ |
 			 IBV_ACCESS_LOCAL_WRITE | // Must be set when REMOTE_WRITE is set.
 			 IBV_ACCESS_REMOTE_WRITE));
 
-	// Prepare MR that we will send to client.
+	// Prepare memory region which will be sent to client,
+	// holding information required to access buffer allocated above.
 	server_metadata_attr.address = (uint64_t)server_buffer_mr->addr;
 	server_metadata_attr.length = server_buffer_mr->length;
 	server_metadata_attr.stag.local_stag = server_buffer_mr->lkey;
@@ -299,16 +300,14 @@ static int send_server_metadata_to_client()
 		return -errno;
 	}
 
-	// Create sge to be included in WR.
+	// Create sge which holds information required by client to access
+	// the buffer allocated above.
 	struct ibv_sge server_send_sge;
-	bzero(&server_send_sge, sizeof(server_send_sge));
 	server_send_sge.addr = (uint64_t)server_metadata_mr->addr;
 	server_send_sge.length = server_metadata_mr->length;
 	server_send_sge.lkey = server_metadata_mr->lkey;
 
 	// Create work request to send to client
-	// Note: server_metadata_mr.rkey is to be used by client to do RDMA
-	// on allocated memory. That might not be relevant here, though.
 	struct ibv_send_wr server_send_wr;
 	bzero(&server_send_wr, sizeof(server_send_wr));
 	server_send_wr.sg_list = &server_send_sge;

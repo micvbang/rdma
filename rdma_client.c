@@ -316,21 +316,19 @@ static int client_remote_memory_ops()
 	 ***************************/
 
 	// In RDMA write, the sge is used to tell the local CA what memory
-	// we want to read from, and write to the remote address.
+	// we want to transfer to the remote CA.
 	// The remote address is set below in rdma_write_wr.wr.rdma.remote_addr.
 	struct ibv_sge rdma_write_sge;
-	bzero(&rdma_write_sge, sizeof(rdma_write_sge));
 	rdma_write_sge.addr = (uint64_t)client_src_mr->addr;
 	rdma_write_sge.length = client_src_mr->length;
 	rdma_write_sge.lkey = client_src_mr->lkey;
 
+	// Create work request to send to local CA.
 	struct ibv_send_wr rdma_write_wr;
 	bzero(&rdma_write_wr, sizeof(rdma_write_wr));
 	rdma_write_wr.sg_list = &rdma_write_sge;
 	rdma_write_wr.num_sge = 1;
 	rdma_write_wr.opcode = IBV_WR_RDMA_WRITE;
-	// I'm not completely sure whether this is correct.
-	// See man ibv_post_send(3).
 	rdma_write_wr.wr.rdma.remote_addr = server_metadata_attr.address;
 	rdma_write_wr.wr.rdma.rkey = server_metadata_attr.stag.local_stag;
 
@@ -357,16 +355,15 @@ static int client_remote_memory_ops()
 	}
 
 	// Create sge
-	// In RDMA read, the sge is used to tell the local CA what local memory
-	// we want to read the remote data in to.
+	// In RDMA read, the sge is used to tell the local CA where in local
+	// memory we want put the data read from remote.
 	// The remote address is set below in rdma_read_wr.wr.rdma.remote_addr.
 	struct ibv_sge rdma_read_sge;
-	bzero(&rdma_read_sge, sizeof(rdma_read_sge));
 	rdma_read_sge.addr = (uint64_t)client_dst_mr->addr;
 	rdma_read_sge.length = client_dst_mr->length;
 	rdma_read_sge.lkey = client_dst_mr->lkey;
 
-	// Create WR
+	// Create work request
 	struct ibv_send_wr rdma_read_wr;
 	bzero(&rdma_read_wr, sizeof(rdma_read_wr));
 	rdma_read_wr.sg_list = &rdma_read_sge;
@@ -375,7 +372,7 @@ static int client_remote_memory_ops()
 	rdma_read_wr.wr.rdma.remote_addr = server_metadata_attr.address;
 	rdma_read_wr.wr.rdma.rkey = server_metadata_attr.stag.local_stag;
 
-	// Post WR
+	// Post work request
 	debug("Trying to perform RDMA read\n");
 	ret = ibv_post_send(client_qp, &rdma_read_wr, &bad_wr);
 	if (ret) {
