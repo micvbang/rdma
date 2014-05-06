@@ -289,7 +289,6 @@ static int send_server_metadata_to_client()
 	}
 
 	printf("Client side buffer information is received...\n")
-	debug("Client sent us its buffer location and credentials, showing \n");
 	show_rdma_buffer_attr(&client_metadata_attr);
 	printf("The client has requested buffer length of : %d bytes\n", client_metadata_attr.length);
 
