@@ -277,16 +277,24 @@ static int accept_client_connection()
 /* This function sends server side buffer metadata to the connected client */
 static int send_server_metadata_to_client()
 {
-	// rdma_error("This function is not yet implemented \n");
 	int ret = -1;
 
-	// A hacky sleep which helps out with a timing problem.
-	// There should be a solution where we just wait on some event,
-	// instead of sleeping.
-	sleep(0.5);
+	// At this point we expect to have one work completion; the receival of
+	// client meta data.
+	struct ibv_wc wc[1];
+	ret = process_work_completion_events(io_completion_channel, wc, 1);
+	if(ret != 1) {
+		rdma_error("We failed to get 1 work completions , ret = %d \n", ret);
+		return ret;
+	}
+
+	printf("Client side buffer information is received...\n")
+	debug("Client sent us its buffer location and credentials, showing \n");
+	show_rdma_buffer_attr(&client_metadata_attr);
+	printf("The client has requested buffer length of : %d bytes\n", client_metadata_attr.length);
 
 	// Allocate buffer to be used by client for RDMA.
-	server_buffer_mr = rdma_buffer_alloc(pd, 1 << 12, // 4KB
+	server_buffer_mr = rdma_buffer_alloc(pd, client_metadata_attr.length, // 4KB
 			(IBV_ACCESS_REMOTE_READ |
 			 IBV_ACCESS_LOCAL_WRITE | // Must be set when REMOTE_WRITE is set.
 			 IBV_ACCESS_REMOTE_WRITE));
